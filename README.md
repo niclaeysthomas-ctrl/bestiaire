@@ -43,14 +43,18 @@ modes d'entraînement libre restent ouverts indéfiniment.
   générées) plus trois modes libres : Révision, Duel des chiffres, Mêlée générale.
 - **Profil** — rang, série, progression par groupe, 22 badges, export/import de la sauvegarde.
 
+## En ligne
+
+**https://niclaeysthomas-ctrl.github.io/bestiaire/**
+
+Sur téléphone, « Ajouter à l'écran d'accueil » installe la PWA : plein écran, hors ligne, et la
+progression est stockée durablement sur l'appareil.
+
 ## Lancer en local
 
 ```bash
 cd ~/bestiaire && python3 -m http.server 8127
 ```
-
-Puis ouvrir `http://localhost:8127` — sur téléphone, « Ajouter à l'écran d'accueil » installe la
-PWA, qui fonctionne ensuite hors ligne.
 
 ## Fichiers
 
