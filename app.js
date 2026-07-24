@@ -15,7 +15,11 @@ const DEF = {
   lus: [],         // dossiers lus
   quiz: {},        // date -> {ok, tot}
   qOk: 0, qTot: 0, parfaits: 0,
-  badges: []
+  badges: [],
+  lex: {},         // id d'espèce -> {ease, interval, reps, due, lapses, introduced}
+  lexNew: {},      // date -> nombre de mots introduits ce jour-là
+  lexRate: 6,      // nouveaux mots par jour
+  lexDone: 0       // révisions cumulées
 };
 let S = load();
 
@@ -144,7 +148,12 @@ const BADGES = [
   ["bexp1", "🧭", "Première expédition", "Découvrir une espèce hors de la carte du jour", s => nbExped() >= 1],
   ["bexp10", "🗺️", "Explorateur de terrain", "10 espèces trouvées en expédition", s => nbExped() >= 10],
   ["bexp50", "⛺", "Grande traversée", "50 espèces trouvées en expédition", s => nbExped() >= 50],
-  ["bexpj5", "🎒", "Journée chargée", "5 expéditions dans la même journée", s => Object.values(S.exped).some(n => n >= 5)]
+  ["bexpj5", "🎒", "Journée chargée", "5 expéditions dans la même journée", s => Object.values(S.exped).some(n => n >= 5)],
+  ["blex1", "📇", "Premier mot", "Réviser un mot du lexique", s => S.lexDone >= 1],
+  ["blex25", "🔤", "Vocabulaire de terrain", "25 mots introduits dans le lexique", s => lexIntroduits() >= 25],
+  ["blexa25", "🧠", "Ça rentre", "25 mots acquis (revus à plus de 21 jours)", s => lexAcquis() >= 25],
+  ["blexa100", "🎓", "Langue du naturaliste", "100 mots acquis", s => lexAcquis() >= 100],
+  ["blex200", "♾️", "Régulier au lexique", "200 révisions cumulées", s => S.lexDone >= 200]
 ];
 function nbVus() { return Object.keys(S.seen).length; }
 function nbExped() { return Object.values(S.seen).filter(v => v && v.x).length; }
@@ -153,6 +162,68 @@ function checkBadges() {
   let nouveau = null;
   for (const b of BADGES) if (!S.badges.includes(b[0])) { try { if (b[4](S)) { S.badges.push(b[0]); nouveau = b; } } catch (e) {} }
   if (nouveau) { save(); setTimeout(() => toast(nouveau[1] + "  Badge : " + nouveau[2]), 900); }
+}
+
+/* ===================== LEXIQUE — répétition espacée =====================
+   Un mot par espèce. Il n'entre dans le paquet que lorsque l'espèce a été
+   découverte : jamais de vocabulaire venu d'une fiche non lue.
+   Moteur SM-2 identique à celui de 990 et CUMBRE — mêmes notes, mêmes intervalles. */
+const JOUR = 86400000;
+function motDe(id) { const a = byId[id]; return a && a.v && a.v[0] ? { mot: a.v[0][0], def: a.v[0][1], a } : null; }
+function lexEtat(id) { return S.lex[id] || { ease: 2.5, interval: 0, reps: 0, due: 0, lapses: 0, introduced: false }; }
+function lexDispo() { return Object.keys(S.seen).filter(id => motDe(id)); }
+function lexNouveauxRestants() {
+  const faits = S.lexNew[today()] || 0;
+  const jamais = lexDispo().filter(id => !lexEtat(id).introduced).length;
+  return Math.min(Math.max(0, S.lexRate - faits), jamais);
+}
+function lexAReviser() {
+  const now = Date.now();
+  return lexDispo().filter(id => { const c = lexEtat(id); return c.introduced && c.due <= now; });
+}
+function lexAcquis() { return lexDispo().filter(id => lexEtat(id).interval >= 21).length; }
+function lexIntroduits() { return lexDispo().filter(id => lexEtat(id).introduced).length; }
+function lexStatut(id) {
+  if (!S.seen[id]) return ["st-lock", "verrouillé"];
+  const c = lexEtat(id);
+  if (!c.introduced) return ["st-neuf", "nouveau"];
+  if (c.interval >= 21) return ["st-acquis", "acquis"];
+  return ["st-cours", "en cours"];
+}
+const LEX_MAX = 365;   // un mot revu au moins une fois par an ne se perd pas
+/* Prochain intervalle, en jours. Deux garde-fous par rapport au SM-2 brut :
+   - « Difficile » doit gagner au moins un jour, sinon ×1,2 sur 1 jour arrondit
+     à 1 et la carte reste bloquée à vie ;
+   - plafond à un an, sinon quelques « Facile » envoient la carte à dix ans. */
+function lexProchainIv(c, note) {
+  if (c.interval < 1) return note === 3 ? 4 : 1;
+  const mult = note === 1 ? 1.2 : note === 2 ? c.ease : c.ease * 1.3;
+  return Math.min(LEX_MAX, Math.max(c.interval + 1, Math.round(c.interval * mult)));
+}
+function lexNoter(id, note) {
+  const c = lexEtat(id), now = Date.now();
+  if (!c.introduced) { c.introduced = true; const t = today(); S.lexNew[t] = (S.lexNew[t] || 0) + 1; }
+  if (note === 0) {
+    c.reps = 0; c.lapses += 1;
+    c.ease = Math.max(1.3, c.ease - 0.2);
+    c.interval = 0;
+    c.due = now + 60000;                     // revient dans la même session
+  } else {
+    c.interval = lexProchainIv(c, note);
+    if (note === 1) c.ease = Math.max(1.3, c.ease - 0.15);
+    if (note === 3) c.ease = Math.min(3.2, c.ease + 0.15);
+    c.reps += 1;
+    c.due = now + Math.max(1, c.interval) * JOUR;
+  }
+  S.lex[id] = c; S.lexDone++;
+  save(); addXp(note === 0 ? 1 : 3);         // silencieux : pas de toast à chaque carte
+}
+function lexApercu(id, note) {               // intervalle annoncé sur les boutons
+  if (note === 0) return "< 1 j";
+  const iv = Math.max(1, lexProchainIv(lexEtat(id), note));
+  if (iv >= 365) return "1 an";
+  if (iv >= 30) return Math.round(iv / 30) + " mois";
+  return iv + " j";
 }
 
 /* ---------- chrome ---------- */
@@ -211,7 +282,10 @@ function fiche(a) {
   <h2 class="sec">Ce qu'il faut savoir</h2>
   ${a.f.map(f => `<div class="fact"><span class="lvl lvl-${f[1]}">${f[1]}</span><p>${f[0]}</p></div>`).join("")}
   <h2 class="sec">Vocabulaire</h2>
-  ${a.v.map(v => `<div class="vocab"><b>${v[0]}</b><p>${v[1]}</p></div>`).join("")}
+  ${a.v.map((v, i) => { const [cls, lbl] = lexStatut(a.id);
+    return `<div class="vocab"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <b>${v[0]}</b>${i === 0 && S.seen[a.id] ? `<span class="lr-s ${cls}">${lbl}</span>` : ""}</div><p>${v[1]}</p></div>`; }).join("")}
+  ${S.seen[a.id] && a.v.length ? `<div class="hint" style="margin:-2px 0 2px">Ce mot est dans ton lexique : il te sera reproposé à intervalles croissants.</div>` : ""}
   ${a.d && a.d.length ? `<h2 class="sec">Dossiers liés</h2>${a.d.filter(id => D.some(d => d.id === id)).map(id => { const d = D.find(x => x.id === id); return `<button class="doss" onclick="ouvrirDossier('${id}')"><span class="di">${d.emo}</span><div class="dn">${d.titre}</div><div class="dd">${d.sub}</div></button>`; }).join("")}` : ""}`;
 }
 
@@ -255,6 +329,10 @@ function renderJour() {
       ${trouvees.length ? `<div class="hint" style="margin:14px 0 8px">Trouvé aujourd'hui — ${trouvees.length}</div>
         <div class="grid">${trouvees.map(x => `<button class="mini rar-${x.rar}" onclick="ouvrirAnimal('${x.id}')"><div class="m-art b-${x.bio}">${x.emo}</div><div class="m-bar"></div><div class="m-nom">${x.nom}</div></button>`).join("")}</div>` : ""}
     </div>
+    ${(() => { const n = lexAReviser().length + lexNouveauxRestants();
+      return n ? `<h2 class="sec">Lexique</h2>
+      <div class="panel"><div class="hint">${n} mot${n > 1 ? "s" : ""} t'attend${n > 1 ? "ent" : ""} au lexique.</div>
+      <button class="btn sm" style="margin-top:10px" onclick="setTab('lexique')">Aller réviser</button></div>` : ""; })()}
     <h2 class="sec">Quiz du jour</h2>
     ${q ? `<div class="panel" style="text-align:center">
         <div style="font-family:var(--serif);font-size:30px;color:var(--or2)">${q.ok}/${q.tot}</div>
@@ -522,6 +600,101 @@ function suivante() {
     <button class="btn gold" style="margin-top:14px" onclick="closeModal();render()">Fermer</button>`);
 }
 
+/* ===================== ONGLET : LEXIQUE ===================== */
+let L = null;
+function renderLexique() {
+  const dispo = lexDispo(), aRev = lexAReviser().length, neufs = lexNouveauxRestants();
+  const total = A.filter(a => a.v && a.v.length).length;
+  const intro = lexIntroduits(), acquis = lexAcquis();
+  const rien = !aRev && !neufs;
+  app.innerHTML = `
+  <div class="stat-grid">
+    <div class="stat"><b>${neufs}</b><span>nouveaux</span></div>
+    <div class="stat"><b>${aRev}</b><span>à revoir</span></div>
+    <div class="stat"><b>${acquis}</b><span>acquis</span></div>
+  </div>
+  <div class="panel" style="margin-top:10px">
+    ${dispo.length === 0
+      ? `<div class="hint">Chaque fiche d'espèce t'apprend un mot. Découvres-en une et il arrivera ici.</div>`
+      : rien
+        ? `<div class="hint">Rien à réviser pour l'instant — c'est le principe : les mots reviennent juste avant que tu ne les oublies. ${neufs === 0 && S.lexRate <= (S.lexNew[today()] || 0) ? "Tu as vu tes nouveaux mots du jour." : ""} Reviens demain, ou découvre de nouvelles espèces.</div>
+           <button class="btn ghost sm" style="margin-top:12px" onclick="lancerLexique(true)">Réviser quand même</button>`
+        : `<div class="hint">${aRev ? `${aRev} mot${aRev > 1 ? "s" : ""} à revoir` : "Aucune révision en retard"}${neufs ? `, ${neufs} nouveau${neufs > 1 ? "x" : ""} à découvrir` : ""}.</div>
+           <button class="btn gold" style="margin-top:12px" onclick="lancerLexique()">Réviser — ${aRev + neufs} carte${aRev + neufs > 1 ? "s" : ""}</button>`}
+  </div>
+  <h2 class="sec">Rythme</h2>
+  <div class="panel">
+    <div class="hint">Nombre de nouveaux mots introduits chaque jour. Les révisions, elles, ne sont jamais plafonnées.</div>
+    <div class="chips" style="margin:12px -15px 0;padding-left:15px;padding-right:15px">
+      ${[3, 6, 10, 20].map(n => `<button class="${S.lexRate === n ? "on" : ""}" onclick="setLexRate(${n})">${n} par jour</button>`).join("")}
+    </div>
+  </div>
+  <h2 class="sec">Le lexique — ${intro}/${total}</h2>
+  <div class="bar" style="margin-bottom:14px"><i style="width:${total ? intro / total * 100 : 0}%"></i></div>
+  ${A.filter(a => a.v && a.v.length).map(a => { const [cls, lbl] = lexStatut(a.id);
+    return S.seen[a.id]
+      ? `<button class="lex-row" onclick="ouvrirAnimal('${a.id}')"><span style="font-size:18px">${a.emo}</span><span class="lr-m">${a.v[0][0]}</span><span class="lr-s ${cls}">${lbl}</span></button>`
+      : `<div class="lex-row" style="opacity:.45"><span style="font-size:18px">🔒</span><span class="lr-m" style="font-weight:500;color:var(--dim2)">mot non découvert</span><span class="lr-s ${cls}">${lbl}</span></div>`;
+  }).join("")}`;
+}
+function setLexRate(n) { S.lexRate = n; save(); renderLexique(); }
+function lancerLexique(force) {
+  const now = Date.now();
+  let file = lexAReviser();
+  const neufs = lexDispo().filter(id => !lexEtat(id).introduced);
+  file = file.concat(shuffle(neufs).slice(0, lexNouveauxRestants()));
+  if (!file.length && force) {                       // révision volontaire hors échéance
+    file = shuffle(lexDispo().filter(id => lexEtat(id).introduced)).slice(0, 12);
+  }
+  if (!file.length) return toast("Rien à réviser pour l'instant");
+  L = { file: shuffle(file), faites: 0, total: file.length, revele: false };
+  drawLex();
+}
+function drawLex() {
+  if (!L.file.length) return finLexique();
+  const id = L.file[0], m = motDe(id), c = lexEtat(id);
+  const neuf = !c.introduced;
+  modal(`<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+      <div style="font-family:var(--serif);letter-spacing:.1em;text-transform:uppercase;font-size:12px;color:var(--dim)">Lexique</div>
+      <div class="hint">${L.faites} / ${L.total}${L.file.length > L.total - L.faites ? " (+ reprises)" : ""}</div></div>
+    <div class="flash" onclick="${L.revele ? "" : "revelerLex()"}">
+      <div class="fl-src">${neuf ? "nouveau mot" : "révision"}</div>
+      <div class="fl-mot">${m.mot}</div>
+      ${L.revele
+        ? `<hr><div class="fl-def">${m.def}</div>
+           <div class="fl-anim"><span>${m.a.emo}</span>rencontré sur la fiche ${m.a.nom}</div>`
+        : `<div class="fl-tap">toucher pour voir la définition</div>`}
+    </div>
+    ${L.revele
+      ? `<div class="rate-row">
+          ${[["Encore", 0], ["Difficile", 1], ["Bien", 2], ["Facile", 3]].map(([lbl, n]) =>
+            `<button class="rate r${n}" onclick="noterLex(${n})">${lbl}<small>${lexApercu(id, n)}</small></button>`).join("")}
+         </div>
+         <div class="hint" style="margin-top:10px;text-align:center">Sois honnête : « Encore » si tu n'as pas retrouvé le sens tout seul.</div>`
+      : `<button class="btn gold" style="margin-top:12px" onclick="revelerLex()">Voir la définition</button>`}
+    <button class="btn ghost sm" style="margin-top:9px" onclick="closeModal();render()">Arrêter la session</button>`);
+}
+function revelerLex() { L.revele = true; drawLex(); }
+function noterLex(n) {
+  const id = L.file.shift();
+  lexNoter(id, n);
+  if (n === 0) L.file.push(id); else L.faites++;    // « Encore » repasse en fin de session
+  L.revele = false;
+  drawLex();
+}
+function finLexique() {
+  const n = L.faites;
+  addXp(n >= 5 ? 10 : 0, n >= 5 ? "session de lexique" : null);
+  modal(`<div style="text-align:center;padding:16px 0 4px">
+      <div style="font-size:44px">📇</div>
+      <div style="font-family:var(--serif);font-size:34px;color:var(--or2);margin-top:8px">${n} mot${n > 1 ? "s" : ""}</div>
+      <div class="hint" style="margin-top:6px">Session terminée. ${lexAcquis()} mot${lexAcquis() > 1 ? "s" : ""} acquis au total.</div>
+      <div class="hint" style="margin-top:10px">Les mots ratés reviendront vite, les autres dans plusieurs jours. C'est l'oubli programmé qui fait tenir la mémoire.</div>
+    </div>
+    <button class="btn gold" style="margin-top:14px" onclick="closeModal();render()">Fermer</button>`);
+  L = null;
+}
+
 /* ===================== ONGLET : QUIZ ===================== */
 function renderQuiz() {
   const t = today(), q = S.quiz[t], vus = nbVus();
@@ -566,6 +739,11 @@ function renderProfil() {
     <div class="stat"><b>${nbExped()}</b><span>en expédition</span></div>
     <div class="stat"><b>${S.lus.length}</b><span>dossiers lus</span></div>
   </div>
+  <div class="stat-grid" style="margin-top:9px">
+    <div class="stat"><b>${lexIntroduits()}</b><span>mots vus</span></div>
+    <div class="stat"><b>${lexAcquis()}</b><span>mots acquis</span></div>
+    <div class="stat"><b>${S.lexDone}</b><span>révisions</span></div>
+  </div>
   <h2 class="sec">Collection par groupe</h2>
   ${GROUPES.map(g => { const tot = A.filter(a => a.gr === g).length, n = nbGr(g);
     return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><span>${PLUR[g]}</span><span class="hint">${n}/${tot}</span></div><div class="bar"><i style="width:${n / tot * 100}%"></i></div></div>`; }).join("")}
@@ -595,7 +773,7 @@ function reset() { if (confirm("Effacer toute la progression ? C'est définitif.
 /* ===================== navigation ===================== */
 let tab = "jour";
 function render() {
-  ({ jour: renderJour, bestiaire: renderBestiaire, dossiers: renderDossiers, quiz: renderQuiz, profil: renderProfil })[tab]();
+  ({ jour: renderJour, bestiaire: renderBestiaire, dossiers: renderDossiers, lexique: renderLexique, quiz: renderQuiz, profil: renderProfil })[tab]();
   app.classList.remove("fade-in"); void app.offsetWidth; app.classList.add("fade-in");
 }
 function setTab(t) {

@@ -44,11 +44,28 @@ les expéditions sont utilisées. Les modes d'entraînement libre restent ouvert
 - **Bestiaire** — les 96 cartes. Les non-découvertes sont des silhouettes ; les toucher donne des
   indices (groupe, régime, milieu, rareté) et permet de les mettre en tête de file sans dévoiler
   leur nom. On peut aussi prioriser un groupe entier.
-- **Dossiers** — 16 enquêtes transversales, chacune close par trois questions.
+- **Dossiers** — 21 enquêtes transversales, chacune close par trois questions.
+- **Lexique** — les 175 mots de vocabulaire en répétition espacée (SM-2), même moteur et mêmes
+  quatre notes que 990 et CUMBRE. Un mot n'entre dans le paquet que lorsque l'espèce qui
+  l'enseigne a été découverte. Rythme réglable : 3, 6, 10 ou 20 nouveaux mots par jour ; les
+  révisions ne sont jamais plafonnées.
 - **Quiz** — le quiz du jour (6 questions : l'espèce du jour, deux révisions, des questions
   générées) plus trois modes libres : Révision, Duel des chiffres, Mêlée générale.
-- **Profil** — rang, série, part de cartes du jour et d'expéditions, progression par groupe,
-  26 badges, export/import de la sauvegarde.
+- **Profil** — rang, série, part de cartes du jour et d'expéditions, mots vus et acquis,
+  progression par groupe, 31 badges, export/import de la sauvegarde.
+
+### Le moteur du lexique
+
+SM-2 classique, avec deux garde-fous ajoutés après mesure :
+
+- **« Difficile » doit gagner au moins un jour.** Sans ça, `1 × 1,2` arrondit à 1 et une carte
+  jugée difficile reste bloquée à un jour pour toujours.
+- **Plafond à un an.** Sans ça, quelques « Facile » d'affilée envoient une carte à neuf ans,
+  c'est-à-dire hors du lexique pour de bon.
+
+Courbes obtenues, en partant d'une carte neuve : « Bien » → 1, 3, 8, 20, 50, 125, 313, 365 j ;
+« Facile » → 4, 14, 51, 196, 365 j ; « Difficile » → 1, 2, 3, 4, 5, 6 j. Un mot est compté
+**acquis** à partir d'un intervalle de 21 jours.
 
 ## En ligne
 

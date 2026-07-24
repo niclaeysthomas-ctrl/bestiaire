@@ -1,4 +1,4 @@
-const CACHE = "bestiaire-v3";
+const CACHE = "bestiaire-v4";
 const FILES = [
   "./", "./index.html", "./style.css", "./app.js",
   "./data-animaux-1.js", "./data-animaux-2.js", "./data-animaux-3.js",
