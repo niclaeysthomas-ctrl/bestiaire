@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0b1310">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>BESTIAIRE — carnet de terrain</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="tb-left">
+    <div class="tb-title">BESTIAIRE</div>
+    <div class="tb-sub" id="tbRank">Curieux</div>
+  </div>
+  <div class="tb-right">
+    <div class="tb-chip" id="tbStreak" title="Série de jours"><span>🔥</span><b>0</b></div>
+    <div class="tb-chip" id="tbXp" title="Points d'observation"><span>✦</span><b>0</b></div>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<nav id="nav">
+  <button data-tab="jour" class="on"><span>🌤️</span>Aujourd'hui</button>
+  <button data-tab="bestiaire"><span>🗂️</span>Bestiaire</button>
+  <button data-tab="dossiers"><span>📖</span>Dossiers</button>
+  <button data-tab="quiz"><span>🎯</span>Quiz</button>
+  <button data-tab="profil"><span>🏅</span>Profil</button>
+</nav>
+
+<div id="modal" class="hidden"><div id="modalBox"></div></div>
+<div id="toast" class="hidden"></div>
+
+<script src="data-animaux-1.js"></script>
+<script src="data-animaux-2.js"></script>
+<script src="data-animaux-3.js"></script>
+<script src="data-dossiers.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

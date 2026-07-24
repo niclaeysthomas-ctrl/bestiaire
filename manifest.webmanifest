@@ -1,0 +1,13 @@
+{
+  "name": "BESTIAIRE — carnet de terrain",
+  "short_name": "Bestiaire",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a1310",
+  "theme_color": "#0a1310",
+  "description": "Une espèce par jour : fiche complète, faits de terrain, quiz et dossiers thématiques.",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

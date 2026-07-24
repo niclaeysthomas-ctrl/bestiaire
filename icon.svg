@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16302a"/><stop offset="1" stop-color="#0a1310"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <circle cx="256" cy="238" r="126" fill="none" stroke="#e0ae4d" stroke-width="6" opacity="0.55"/>
+  <path d="M186 300c-14-26-16-58-4-86 14-33 46-54 82-54s68 21 82 54c12 28 10 60-4 86" fill="none" stroke="#e0ae4d" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="216" cy="232" r="15" fill="#e0ae4d"/>
+  <circle cx="296" cy="232" r="15" fill="#e0ae4d"/>
+  <path d="M256 268c-16 0-26 12-26 24 0 16 12 26 26 26s26-10 26-26c0-12-10-24-26-24z" fill="#f5cf85"/>
+  <text x="256" y="424" font-family="Georgia,serif" font-size="52" letter-spacing="10" fill="#f5cf85" text-anchor="middle">BEST</text>
+</svg>

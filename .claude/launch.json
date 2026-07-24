@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bestiaire",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8127", "--directory", "/Users/niclaeys/bestiaire"],
+      "port": 8127
+    }
+  ]
+}
