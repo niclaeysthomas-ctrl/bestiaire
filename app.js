@@ -6,8 +6,9 @@ const KEY = "bestiaire_v1";
 /* ---------- état ---------- */
 const DEF = {
   xp: 0, streak: 0, best: 0, last: null,
-  seen: {},        // id -> {d: date, n: note}
+  seen: {},        // id -> {d: date, n: note, x: 1 si trouvée en expédition}
   hist: {},        // date -> id
+  exped: {},       // date -> nombre d'expéditions ce jour-là
   queue: null,
   wish: [],        // ids priorisés
   theme: null,     // groupe priorisé
@@ -72,22 +73,43 @@ function buildQueue() {
   // progression douce : les communs d'abord, les légendaires plus tard
   return [].concat(g[0], g[1], g[2].slice(0, 8), g[3].slice(0, 4), g[2].slice(8), g[4].slice(0, 3), g[3].slice(4), g[4].slice(3));
 }
+/* Prochaine espèce à révéler, dans l'ordre : souhaits étoilés, groupe prioritaire,
+   file de progression. Renvoie null quand tout le bestiaire a été découvert. */
+function prochaineEspece() {
+  if (!S.queue) S.queue = buildQueue();
+  const pris = new Set(Object.keys(S.seen));
+  Object.values(S.hist).forEach(i => pris.add(i));
+  for (const w of S.wish) if (!pris.has(w) && byId[w]) return w;
+  if (S.theme) { const c = A.filter(a => a.gr === S.theme && !pris.has(a.id)); if (c.length) return c[Math.floor(Math.random() * c.length)].id; }
+  const q = S.queue.find(x => !pris.has(x));
+  if (q) return q;
+  const reste = A.filter(a => !pris.has(a.id));
+  return reste.length ? reste[Math.floor(Math.random() * reste.length)].id : null;
+}
 function animalDuJour() {
   const t = today();
   if (S.hist[t] && byId[S.hist[t]]) return byId[S.hist[t]];
-  if (!S.queue) S.queue = buildQueue();
-  const pris = new Set(Object.values(S.hist));
-  let id = null;
-  // 1. souhaits explicites
-  for (const w of S.wish) if (!pris.has(w) && byId[w]) { id = w; S.wish = S.wish.filter(x => x !== w); break; }
-  // 2. thème prioritaire
-  if (!id && S.theme) { const c = A.filter(a => a.gr === S.theme && !pris.has(a.id)); if (c.length) id = c[Math.floor(Math.random() * c.length)].id; }
-  // 3. file normale
-  if (!id) id = S.queue.find(x => !pris.has(x));
-  // 4. tout vu : on recycle
-  if (!id) id = A[Math.floor(Math.random() * A.length)].id;
+  const id = prochaineEspece() || A[Math.floor(Math.random() * A.length)].id;
   S.hist[t] = id; save();
   return byId[id];
+}
+function resteADecouvrir() { return A.length - nbVus(); }
+function decouvrir(id, exped) {
+  if (!byId[id] || S.seen[id]) return false;
+  S.seen[id] = { d: today(), n: "", x: exped ? 1 : 0 };
+  S.wish = S.wish.filter(x => x !== id);
+  if (exped) { const t = today(); S.exped[t] = (S.exped[t] || 0) + 1; }
+  save();
+  addXp(exped ? 4 : 10, exped ? "expédition" : "espèce du jour");
+  return true;
+}
+function expedition(id) {
+  const cible = id || prochaineEspece();
+  if (!cible) { closeModal(); return toast("Tu as découvert les " + A.length + " espèces du bestiaire."); }
+  closeModal();
+  if (!decouvrir(cible, true)) return;
+  render();
+  ouvrirAnimal(cible);
 }
 
 /* ---------- XP & badges ---------- */
@@ -118,9 +140,14 @@ const BADGES = [
   ["bq100", "💯", "Centurion", "100 bonnes réponses", s => S.qOk >= 100],
   ["bd5", "📖", "Studieux", "5 dossiers lus", s => S.lus.length >= 5],
   ["bdall", "🎓", "Érudit", "Tous les dossiers lus", s => S.lus.length >= D.length],
-  ["bnote", "✍️", "Carnet de terrain", "Écrire une note sur une fiche", s => Object.values(S.seen).some(v => v.n && v.n.trim())]
+  ["bnote", "✍️", "Carnet de terrain", "Écrire une note sur une fiche", s => Object.values(S.seen).some(v => v.n && v.n.trim())],
+  ["bexp1", "🧭", "Première expédition", "Découvrir une espèce hors de la carte du jour", s => nbExped() >= 1],
+  ["bexp10", "🗺️", "Explorateur de terrain", "10 espèces trouvées en expédition", s => nbExped() >= 10],
+  ["bexp50", "⛺", "Grande traversée", "50 espèces trouvées en expédition", s => nbExped() >= 50],
+  ["bexpj5", "🎒", "Journée chargée", "5 expéditions dans la même journée", s => Object.values(S.exped).some(n => n >= 5)]
 ];
 function nbVus() { return Object.keys(S.seen).length; }
+function nbExped() { return Object.values(S.seen).filter(v => v && v.x).length; }
 function nbGr(g) { return Object.keys(S.seen).filter(i => byId[i] && byId[i].gr === g).length; }
 function checkBadges() {
   let nouveau = null;
@@ -163,7 +190,9 @@ function carte(a, opts = {}) {
     </div></div>`;
 }
 function fiche(a) {
+  // Sans vitesse connue, la longévité prend toute la ligne : pas de demi-case vide.
   const vitesse = a.vit ? `<div><div class="k">Vitesse</div><div class="v">${a.vit} km/h</div></div>` : "";
+  const longevite = `<div class="${a.vit ? "" : "full"}"><div class="k">Longévité</div><div class="v">${a.vie >= 900 ? "indéfinie" : "~" + a.vie + " ans"}</div></div>`;
   return `<p style="font-size:15.5px;line-height:1.6;margin:16px 0 4px">${a.res}</p>
   <h2 class="sec">Carte d'identité</h2>
   <div class="rows">
@@ -174,7 +203,7 @@ function fiche(a) {
     <div><div class="k">Taille</div><div class="v">${a.taille}</div></div>
     <div><div class="k">Masse</div><div class="v">${fmtPoids(a.poidsKg)}</div></div>
     ${vitesse}
-    <div><div class="k">Longévité</div><div class="v">${a.vie >= 900 ? "indéfinie" : "~" + a.vie + " ans"}</div></div>
+    ${longevite}
     <div class="full"><div class="k">Habitat</div><div class="v">${a.hab}</div></div>
     <div class="full"><div class="k">Répartition</div><div class="v">${a.rep}</div></div>
     <div class="full"><div class="k">Statut UICN</div><div class="v">${a.uicn} — ${UICN[a.uicn]}</div></div>
@@ -210,9 +239,22 @@ function renderJour() {
   }
 
   const note = (S.seen[a.id] && S.seen[a.id].n) || "";
+  const reste = resteADecouvrir();
+  const trouvees = Object.keys(S.seen).filter(i => S.seen[i].d === t && i !== a.id).map(i => byId[i]).filter(Boolean);
   app.innerHTML = `<div class="hint" style="text-transform:capitalize;margin-bottom:14px">${dateTxt}</div>
     ${carte(a)}
     ${fiche(a)}
+    <h2 class="sec">Expédition</h2>
+    <div class="panel">
+      ${reste ? `<div class="hint">La carte du jour, c'est le rituel. Mais rien ne t'oblige à t'arrêter là : pars en expédition autant de fois que tu veux. Une trouvaille rapporte moins qu'une carte du jour, et elle entre dans le bestiaire et dans les quiz exactement pareil.</div>
+      <button class="btn gold" style="margin-top:12px;line-height:1.25" onclick="expedition()">Partir en expédition
+        <span style="display:block;font-weight:500;font-size:12px;opacity:.72;margin-top:2px">${reste} espèce${reste > 1 ? "s" : ""} encore inconnue${reste > 1 ? "s" : ""}</span></button>
+      ${S.theme ? `<div class="hint" style="margin-top:10px">Priorité en cours : ${PLUR[S.theme].toLowerCase()}. ${S.wish.length ? `${S.wish.length} carte${S.wish.length > 1 ? "s" : ""} étoilée${S.wish.length > 1 ? "s" : ""} passeront d'abord.` : ""}</div>`
+        : S.wish.length ? `<div class="hint" style="margin-top:10px">${S.wish.length} carte${S.wish.length > 1 ? "s" : ""} étoilée${S.wish.length > 1 ? "s" : ""} en tête de file.</div>` : ""}`
+      : `<div class="hint">Tu as découvert les ${A.length} espèces du bestiaire. Il n'y a plus rien à trouver — il reste tout à réviser.</div>`}
+      ${trouvees.length ? `<div class="hint" style="margin:14px 0 8px">Trouvé aujourd'hui — ${trouvees.length}</div>
+        <div class="grid">${trouvees.map(x => `<button class="mini rar-${x.rar}" onclick="ouvrirAnimal('${x.id}')"><div class="m-art b-${x.bio}">${x.emo}</div><div class="m-bar"></div><div class="m-nom">${x.nom}</div></button>`).join("")}</div>` : ""}
+    </div>
     <h2 class="sec">Quiz du jour</h2>
     ${q ? `<div class="panel" style="text-align:center">
         <div style="font-family:var(--serif);font-size:30px;color:var(--or2)">${q.ok}/${q.tot}</div>
@@ -224,9 +266,7 @@ function renderJour() {
     <button class="btn ghost sm" style="margin-top:8px" onclick="saveNote('${a.id}')">Enregistrer la note</button>`;
 }
 function revele() {
-  const a = animalDuJour();
-  S.seen[a.id] = { d: today(), n: "" }; save();
-  addXp(10, "espèce découverte");
+  decouvrir(animalDuJour().id, false);
   renderJour(); window.scrollTo(0, 0);
 }
 function saveNote(id) {
@@ -264,7 +304,7 @@ function renderBestiaire() {
   </div>
   <h2 class="sec">Ce que tu veux explorer</h2>
   <div class="panel">
-    <div class="hint">Choisis un groupe : les prochaines espèces du jour y seront piochées en priorité. Tu peux aussi marquer une carte inconnue d'une étoile — elle passera en tête.</div>
+    <div class="hint">Choisis un groupe : les prochaines espèces — carte du jour comme expéditions — y seront piochées en priorité. Tu peux aussi ouvrir une carte inconnue pour la découvrir tout de suite, ou l'étoiler pour qu'elle passe en tête.</div>
     <div class="chips" style="margin:12px -15px 0;padding-left:15px;padding-right:15px">
       <button class="${!S.theme ? "on" : ""}" onclick="setTheme(null)">Au hasard</button>
       ${GROUPES.map(g => `<button class="${S.theme === g ? "on" : ""}" onclick="setTheme('${g}')">${PLUR[g]}</button>`).join("")}
@@ -295,7 +335,8 @@ function ouvrirInconnu(id) {
       <div class="full"><div class="k">Milieu</div><div class="v">${a.hab}</div></div>
       <div class="full"><div class="k">Rareté</div><div class="v">${RARN[a.rar]}</div></div>
     </div>
-    <button class="btn ${dedans ? "ghost" : "gold"}" style="margin-top:14px" onclick="toggleWish('${id}')">${dedans ? "Retirer de la liste d'attente" : "★ Mettre en tête de liste"}</button>
+    <button class="btn gold" style="margin-top:14px" onclick="expedition('${id}')">Découvrir celle-ci maintenant</button>
+    <button class="btn ghost" style="margin-top:9px" onclick="toggleWish('${id}')">${dedans ? "Retirer de la liste d'attente" : "★ Garder pour plus tard, en tête de file"}</button>
     <button class="btn ghost" style="margin-top:9px" onclick="closeModal()">Fermer</button>`);
 }
 function toggleWish(id) {
@@ -520,6 +561,11 @@ function renderProfil() {
     <div class="stat"><b>${S.best}</b><span>meilleure série</span></div>
     <div class="stat"><b>${nbVus()}</b><span>espèces</span></div>
   </div>
+  <div class="stat-grid" style="margin-top:9px">
+    <div class="stat"><b>${nbVus() - nbExped()}</b><span>cartes du jour</span></div>
+    <div class="stat"><b>${nbExped()}</b><span>en expédition</span></div>
+    <div class="stat"><b>${S.lus.length}</b><span>dossiers lus</span></div>
+  </div>
   <h2 class="sec">Collection par groupe</h2>
   ${GROUPES.map(g => { const tot = A.filter(a => a.gr === g).length, n = nbGr(g);
     return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><span>${PLUR[g]}</span><span class="hint">${n}/${tot}</span></div><div class="bar"><i style="width:${n / tot * 100}%"></i></div></div>`; }).join("")}
@@ -529,7 +575,7 @@ function renderProfil() {
   <div class="panel"><div class="hint">Tout est stocké sur cet appareil uniquement. Exporte de temps en temps si tu changes de téléphone.</div>
     <div class="btn-row"><button class="btn sm" onclick="exporter()">Exporter</button><button class="btn sm" onclick="importer()">Importer</button></div>
     <button class="btn sm ghost" style="margin-top:9px;color:var(--rouge)" onclick="reset()">Tout effacer</button></div>
-  <p class="hint" style="margin-top:18px;text-align:center">BESTIAIRE — ${A.length} espèces, ${D.length} dossiers.<br>Les fiches signalent le niveau de chaque information : <b>base</b>, <b>pointu</b>, <b>expert</b>.</p>`;
+  <p class="hint" style="margin-top:18px;text-align:center">BESTIAIRE — ${A.length} espèces, ${D.length} dossiers, ${A.reduce((s, x) => s + x.f.length, 0)} faits.<br>Les fiches signalent le niveau de chaque information : <b>base</b>, <b>pointu</b>, <b>expert</b>.</p>`;
 }
 function exporter() {
   const blob = new Blob([JSON.stringify(S)], { type: "application/json" });

@@ -1,7 +1,7 @@
 /* BESTIAIRE — dossiers thématiques
    {id, titre, emo, sub, intro, sec:[[titre, texte]], q:[[question,[choix],bonne,explication]]}
 */
-window.DOSSIERS = [
+window.DOSSIERS = (window.DOSSIERS || []).concat([
 
 {id:"taxo",titre:"Lire un nom scientifique",emo:"🔤",sub:"Le mode d'emploi de la classification",
 intro:"Tous les noms latins que tu croises dans ce bestiaire obéissent à une grammaire. La comprendre, c'est arrêter de retenir des mots par cœur et commencer à lire des relations de parenté.",
@@ -210,4 +210,4 @@ q:[["Pourquoi les animaux abyssaux résistent-ils à la pression ?",["Leur peau 
 ["Qu'est-ce que la migration nycthémérale ?",["Une migration saisonnière","La remontée nocturne quotidienne des animaux du large","Une migration de reproduction","Un déplacement vers les pôles"],1,"Le plus grand mouvement de biomasse de la planète, chaque nuit."],
 ["Sur quoi repose l'écosystème des cheminées hydrothermales ?",["La neige marine","La chimiosynthèse","La photosynthèse","Les carcasses de baleines"],1,"Découverte en 1977 : la vie sans lumière est possible."]]}
 
-];
+]);

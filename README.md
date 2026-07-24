@@ -10,15 +10,15 @@ n'est pas dilué, il est défini au moment où il apparaît.
 
 | | |
 |---|---|
-| Espèces | 96 — 35 mammifères, 17 oiseaux, 9 reptiles, 5 amphibiens, 12 poissons, 18 invertébrés |
-| Faits de terrain | 449, chacun étiqueté **base**, **pointu** ou **expert** |
-| Définitions de vocabulaire | 96, une par fiche |
-| Questions écrites à la main | 240 |
+| Espèces | 175 — 50 mammifères, 32 oiseaux, 18 reptiles, 11 amphibiens, 24 poissons, 40 invertébrés |
+| Faits de terrain | 837, chacun étiqueté **base**, **pointu** ou **expert** |
+| Définitions de vocabulaire | 175, une par fiche |
+| Questions écrites à la main | 413 |
 | Questions générées | illimitées (comparaisons, taxonomie, « qui suis-je », statuts UICN) |
-| Dossiers thématiques | 16 |
+| Dossiers thématiques | 21 |
 
-À raison d'une espèce par jour, il y a un peu plus de trois mois de contenu quotidien — puis les
-modes d'entraînement libre restent ouverts indéfiniment.
+À raison d'une espèce par jour, il y a près de six mois de contenu quotidien — et bien moins si
+les expéditions sont utilisées. Les modes d'entraînement libre restent ouverts indéfiniment.
 
 ## Principes de contenu
 
@@ -34,14 +34,21 @@ modes d'entraînement libre restent ouverts indéfiniment.
 
 ## Écrans
 
-- **Aujourd'hui** — carte face cachée à révéler (+10 ✦), fiche complète, carnet de notes libre.
+- **Aujourd'hui** — carte face cachée à révéler (+10 ✦), fiche complète, carnet de notes libre,
+  puis le bloc **Expédition**.
+- **Expédition** — une fois la carte du jour révélée, on peut découvrir autant d'espèces
+  supplémentaires qu'on veut, à la demande (+4 ✦ chacune). Elles entrent dans le bestiaire, les
+  badges et les quiz exactement comme la carte du jour. Le rituel quotidien reste distinct : la
+  série ne dépend que de lui, et il rapporte davantage. On peut aussi partir d'une carte
+  verrouillée précise et la découvrir immédiatement.
 - **Bestiaire** — les 96 cartes. Les non-découvertes sont des silhouettes ; les toucher donne des
   indices (groupe, régime, milieu, rareté) et permet de les mettre en tête de file sans dévoiler
   leur nom. On peut aussi prioriser un groupe entier.
 - **Dossiers** — 16 enquêtes transversales, chacune close par trois questions.
 - **Quiz** — le quiz du jour (6 questions : l'espèce du jour, deux révisions, des questions
   générées) plus trois modes libres : Révision, Duel des chiffres, Mêlée générale.
-- **Profil** — rang, série, progression par groupe, 22 badges, export/import de la sauvegarde.
+- **Profil** — rang, série, part de cartes du jour et d'expéditions, progression par groupe,
+  26 badges, export/import de la sauvegarde.
 
 ## En ligne
 
@@ -61,17 +68,25 @@ cd ~/bestiaire && python3 -m http.server 8127
 ```
 index.html            structure
 style.css             thème (carnet de terrain nocturne)
-app.js                état, sélection quotidienne, moteur de quiz, badges
+app.js                état, file de découverte, expéditions, moteur de quiz, badges
 data-animaux-1.js     mammifères
 data-animaux-2.js     oiseaux, reptiles, amphibiens
 data-animaux-3.js     poissons, invertébrés
+data-animaux-4.js     mammifères et oiseaux (suite)
+data-animaux-5.js     reptiles, amphibiens, poissons (suite)
+data-animaux-6.js     invertébrés (suite)
 data-dossiers.js      dossiers thématiques
+data-dossiers-2.js    dossiers thématiques (suite)
 sw.js                 cache hors ligne (stale-while-revalidate : se met à jour tout seul)
 ```
 
+Les fichiers de données s'ajoutent les uns aux autres (`concat`) : l'ordre n'a pas d'importance,
+seule compte leur présence dans `index.html` et dans la liste de `sw.js`.
+
 ## Ajouter une espèce
 
-Ajouter une entrée dans un des `data-animaux-*.js`. Le format est documenté en tête du fichier 1.
+Ajouter une entrée dans un des `data-animaux-*.js`, ou créer un `data-animaux-7.js` sur le même
+modèle et le déclarer aux deux endroits ci-dessus. Le format est documenté en tête du fichier 1.
 Rien d'autre à toucher : la file quotidienne, la grille, les filtres, les badges et le générateur
 de questions se recalculent à partir des données.
 

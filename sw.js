@@ -1,8 +1,10 @@
-const CACHE = "bestiaire-v2";
+const CACHE = "bestiaire-v3";
 const FILES = [
   "./", "./index.html", "./style.css", "./app.js",
   "./data-animaux-1.js", "./data-animaux-2.js", "./data-animaux-3.js",
-  "./data-dossiers.js", "./manifest.webmanifest", "./icon.svg"
+  "./data-animaux-4.js", "./data-animaux-5.js", "./data-animaux-6.js",
+  "./data-dossiers.js", "./data-dossiers-2.js",
+  "./manifest.webmanifest", "./icon.svg"
 ];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
